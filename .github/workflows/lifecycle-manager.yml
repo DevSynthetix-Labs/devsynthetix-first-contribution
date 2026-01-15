@@ -1,0 +1,51 @@
+name: Cycle Manager (Auto Issue Creator)
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  issues: write
+
+jobs:
+  create-next-issue:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create New Contribution Issue
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            
+            // Generate a random ID to keep titles unique
+            const slotId = Math.floor(Math.random() * 100000);
+
+            await github.rest.issues.create({
+              owner,
+              repo,
+              title: `Contribution Slot: Add your name [ID: ${slotId}]`,
+              body: `
+              ### 👋 Welcome to DevSynthetix First Contribution!
+              
+              This is an automatically generated issue for beginners.
+              
+              **Your Task:**
+              1. Fork this repository.
+              2. Edit \`contributors/README.md\`.
+              3. Add your GitHub Username to the list (in alphabetical order).
+              4. Create a Pull Request.
+              
+              ---
+              ### ⚠️ IMPORTANT
+              When creating your PR, link this issue by typing:
+              
+              > **Closes #<issue-number>** *(Look at the top of this page to find the issue number)*
+              
+              ---
+              **Want to start? Comment "Assign me" below!** 🚀
+              `,
+              labels: ['good first issue', 'beginner-friendly']
+            });
+            
