@@ -1,54 +1,83 @@
-name: Cycle Manager (Auto Issue Creator)
+name: Cycle Manager (Maintain 4 Active Slots)
 
 on:
   pull_request:
-    types: [closed]
-  workflow_dispatch:      # 👈 YEH LINE ADD KARNI HAI (Manual Button)
+    types: [closed]      # Jab PR close ho
+  workflow_dispatch:     # Manual Button (Emergency ke liye)
+  schedule:
+    - cron: '0 */6 * * *' # Safety Check (Har 6 ghante)
 
 permissions:
   issues: write
 
 jobs:
-  create-next-issue:
-    # Neeche wali line hata do ya comment kar do taaki button hamesha chale
-    # if: github.event.pull_request.merged == true 
-    
+  maintain-slots:
     runs-on: ubuntu-latest
     steps:
-      - name: Create New Contribution Issue
+      - name: Ensure 4 Open Issues
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
-            const slotId = Math.floor(Math.random() * 100000);
+            const TARGET_COUNT = 4; // Hamesha 4 issues active rahenge
 
-            await github.rest.issues.create({
+            // 1. Check karo abhi kitne "Contribution Slot" issues open hain
+            const openIssues = await github.rest.issues.listForRepo({
               owner,
               repo,
-              title: `Contribution Slot: Open for Contribution [ID: ${slotId}]`,
-              body: `
-              ### 👋 Welcome to DevSynthetix First Contribution!
-              
-              This is an automatically generated issue for beginners to practice Open Source.
-              
-              **Your Task:**
-              1. Fork this repository.
-              2. Edit the file: \`contributors/README.md\`.
-              3. Add your GitHub Username to the list (in alphabetical order).
-              4. Create a Pull Request (PR).
-              
-              ---
-              ### ⚠️ VERY IMPORTANT INSTRUCTION
-              When creating your PR, you **MUST** write the following in the description to link this issue:
-              
-              > **Closes #<issue-number>** *(Look at the top of this page to find the issue number)*
-              
-              ---
-              Once your PR is merged, this issue will close automatically, and a new one will open for the next person.
-              
-              **Ready? Comment "Assign me" below!** 🚀
-              `,
-              labels: ['good first issue', 'help wanted', 'documentation', 'beginner-friendly']
+              state: 'open',
+              labels: 'good first issue',
+              per_page: 100
             });
+
+            // Sirf wahi gino jinke title me "Contribution Slot" likha ho
+            const activeSlots = openIssues.data.filter(issue => 
+              issue.title.includes("Contribution Slot")
+            );
+            
+            const currentCount = activeSlots.length;
+            const needed = TARGET_COUNT - currentCount;
+
+            console.log(`Currently Open: ${currentCount}`);
+            console.log(`Need to Create: ${needed}`);
+
+            // 2. Agar 4 se kam hain, to naye banao
+            if (needed > 0) {
+              for (let i = 0; i < needed; i++) {
+                const slotId = Math.floor(Math.random() * 100000);
+                
+                await github.rest.issues.create({
+                  owner,
+                  repo,
+                  title: `Contribution Slot: Open for Contribution [ID: ${slotId}]`,
+                  body: `
+                  ### 👋 Welcome to DevSynthetix First Contribution!
+                  
+                  This is an open slot for beginners to practice Open Source.
+                  
+                  **Your Task:**
+                  1. Fork this repository.
+                  2. Edit the file: \`contributors/README.md\`.
+                  3. Add your GitHub Username to the list.
+                  4. Create a Pull Request (PR).
+                  
+                  ---
+                  ### ⚠️ IMPORTANT
+                  In your PR description, write:
+                  > **Closes #<issue-number>** *(Check the number at the top)*
+                  
+                  ---
+                  **Ready? Comment "Assign me" below!** 🚀
+                  `,
+                  labels: ['good first issue', 'help wanted', 'documentation']
+                });
+                
+                // Thoda wait karo taaki GitHub API flood na ho
+                await new Promise(r => setTimeout(r, 1000));
+              }
+              console.log(`${needed} new issues created! 🚀`);
+            } else {
+              console.log("Already 4 slots open. No action needed. ✅");
+            }
             
