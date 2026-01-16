@@ -23,21 +23,20 @@ jobs:
             const actor = context.actor;
             const prBody = context.payload.pull_request.body || "";
 
-            // 1. Closes # Check (Reminder)
+            // 1. Check for "Closes #" (Reminder)
             if (!prBody.toLowerCase().includes('closes #')) {
                await github.rest.issues.createComment({
                 owner, repo, issue_number: prNumber,
-                body: `👋 **@${actor}**, Quick Reminder:\nPlease add \`Closes #<issue_number>\` to your PR description to auto-close the issue.`
+                body: `👋 **@${actor}**, Quick Reminder:\nPlease add \`Closes #<issue_number>\` to your PR description.`
               });
             }
 
-            // 2. File Integrity Check
+            // 2. File Security Scan (Critical Step)
             const files = await github.rest.pulls.listFiles({ owner, repo, pull_number: prNumber });
             
-            // ✅ AUTO-MERGE ALLOWED FILES (Safe List)
+            // Files allowed for Auto-Merge
             const autoMergeFiles = ['contributors/README.md', 'reviews/feedback.md'];
-            
-            // ⚠️ MANUAL REVIEW FILES (Admin List)
+            // Files allowed for Manual Review
             const manualReviewFiles = ['README.md', 'CONTRIBUTING.md'];
 
             let isAutoMergeSafe = true;
@@ -45,36 +44,54 @@ jobs:
             let invalidFiles = [];
 
             for (const file of files.data) {
+              
+              // 🚨 SECURITY RULE: Reject .github changes immediately
+              if (file.filename.startsWith('.github/')) {
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: prNumber,
+                    body: `🛑 **Security Breach Detected:**\n\n@${actor}, modifying system files inside \`.github/\` is **Strictly Prohibited**.\n\n**Action:** 🔒 This PR is automatically rejected and closed.`
+                  });
+                  
+                  // PR ko turant Close (Reject) kar do
+                  await github.rest.pulls.update({
+                    owner, repo, pull_number: prNumber, state: 'closed'
+                  });
+                  
+                  await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels: ['security-risk', 'invalid'] });
+                  return; // Yahi ruk jao, aage kuch mat karo
+              }
+
+              // Normal File Checking
               if (manualReviewFiles.includes(file.filename)) {
                 isAutoMergeSafe = false;
-                needsManualReview = true; // Sahi file hai, par Admin check karega
+                needsManualReview = true; 
               } else if (!autoMergeFiles.includes(file.filename)) {
-                isAutoMergeSafe = false; // Bilkul galat file (Reject)
+                isAutoMergeSafe = false;
                 invalidFiles.push(file.filename);
               }
             }
 
-            // --- SCENARIO A: Invalid Files (Reject) ---
+            // --- SCENARIO A: Invalid Files (Unknown files) ---
             if (invalidFiles.length > 0) {
                await github.rest.issues.createComment({
                 owner, repo, issue_number: prNumber,
-                body: `🚫 **Security Alert:**\n\nYou edited files that are not open for contribution: \`${invalidFiles.join(', ')}\`.\nPlease only edit files mentioned in the Issue.`
+                body: `🚫 **Invalid Files:**\n\nYou edited files that are not part of the contribution list: \`${invalidFiles.join(', ')}\`.\nPlease revert these changes.`
               });
               await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels: ['invalid'] });
               return; 
             }
 
-            // --- SCENARIO B: Manual Review Needed (Main Readme) ---
+            // --- SCENARIO B: Manual Review Needed ---
             if (needsManualReview) {
                await github.rest.issues.createComment({
                 owner, repo, issue_number: prNumber,
-                body: `👀 **Manual Review Required:**\n\nGood job @${actor}! Since you edited a core documentation file (\`README.md\`), a maintainer needs to verify the grammar/text before merging.\n\n✅ **Status:** AI Check Passed. Waiting for Admin Merge.`
+                body: `👀 **Manual Review Required:**\n\nYou edited core documentation. A maintainer will verify the changes before merging.`
               });
               await github.rest.issues.addLabels({ owner, repo, issue_number: prNumber, labels: ['needs-review'] });
-              return; // Bot yahi ruk jayega
+              return; 
             }
 
-            // --- SCENARIO C: Auto Merge (Contributors & Reviews) ---
+            // --- SCENARIO C: Auto Merge (Safe) ---
             if (isAutoMergeSafe) {
               await github.rest.pulls.createReview({
                 owner, repo, pull_number: prNumber, event: 'APPROVE', body: "✅ **AI Review:** Safe to merge."
