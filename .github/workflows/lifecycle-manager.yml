@@ -1,11 +1,11 @@
-name: Cycle Manager (Maintain 4 Active Slots)
+name: Cycle Manager (4 Unique Slots)
 
 on:
   pull_request:
-    types: [closed]      # Jab PR close ho
-  workflow_dispatch:     # Manual Button (Emergency ke liye)
+    types: [closed]
+  workflow_dispatch:      # Manual Trigger Button
   schedule:
-    - cron: '0 */6 * * *' # Safety Check (Har 6 ghante)
+    - cron: '0 */12 * * *' # Backup Check every 12 hours
 
 permissions:
   issues: write
@@ -14,70 +14,79 @@ jobs:
   maintain-slots:
     runs-on: ubuntu-latest
     steps:
-      - name: Ensure 4 Open Issues
+      - name: Maintain 4 Unique Issues
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
-            const TARGET_COUNT = 4; // Hamesha 4 issues active rahenge
 
-            // 1. Check karo abhi kitne "Contribution Slot" issues open hain
+            // --- 4 TYPES OF ISSUES CONFIGURATION ---
+            const templates = [
+              {
+                title: "Contribution Slot: Add Your Name [A]",
+                file: "`contributors/README.md`",
+                label: "good first issue",
+                note: "Add your name to the list alphabetically."
+              },
+              {
+                title: "Contribution Slot: Add Your Name [B]",
+                file: "`contributors/README.md`",
+                label: "good first issue",
+                note: "Add your name to the list alphabetically."
+              },
+              {
+                title: "Documentation: Fix Grammar in Readme",
+                file: "`README.md` (Main File)",
+                label: "documentation",
+                note: "**Note:** This change requires Manual Admin Review."
+              },
+              {
+                title: "Community: Write a Review for DevSynthetix",
+                file: "`reviews/feedback.md`",
+                label: "community-feedback",
+                note: "Write a short review about the project in the feedback file."
+              }
+            ];
+
+            // 1. Check Currently Open Issues
             const openIssues = await github.rest.issues.listForRepo({
-              owner,
-              repo,
-              state: 'open',
-              labels: 'good first issue',
-              per_page: 100
+              owner, repo, state: 'open', per_page: 100
             });
 
-            // Sirf wahi gino jinke title me "Contribution Slot" likha ho
-            const activeSlots = openIssues.data.filter(issue => 
-              issue.title.includes("Contribution Slot")
-            );
-            
-            const currentCount = activeSlots.length;
-            const needed = TARGET_COUNT - currentCount;
+            // 2. Loop through templates and create missing ones
+            for (const tpl of templates) {
+              const exists = openIssues.data.some(issue => issue.title === tpl.title);
 
-            console.log(`Currently Open: ${currentCount}`);
-            console.log(`Need to Create: ${needed}`);
-
-            // 2. Agar 4 se kam hain, to naye banao
-            if (needed > 0) {
-              for (let i = 0; i < needed; i++) {
-                const slotId = Math.floor(Math.random() * 100000);
+              if (!exists) {
+                console.log(`Creating missing issue: ${tpl.title}`);
                 
                 await github.rest.issues.create({
                   owner,
                   repo,
-                  title: `Contribution Slot: Open for Contribution [ID: ${slotId}]`,
+                  title: tpl.title,
                   body: `
-                  ### 👋 Welcome to DevSynthetix First Contribution!
-                  
-                  This is an open slot for beginners to practice Open Source.
+                  ### 👋 Welcome Contributor!
                   
                   **Your Task:**
                   1. Fork this repository.
-                  2. Edit the file: \`contributors/README.md\`.
-                  3. Add your GitHub Username to the list.
+                  2. Edit the file: ${tpl.file}.
+                  3. ${tpl.note}
                   4. Create a Pull Request (PR).
                   
                   ---
-                  ### ⚠️ IMPORTANT
+                  **Important:**
                   In your PR description, write:
-                  > **Closes #<issue-number>** *(Check the number at the top)*
+                  > **Closes #<issue-number>**
                   
                   ---
                   **Ready? Comment "Assign me" below!** 🚀
                   `,
-                  labels: ['good first issue', 'help wanted', 'documentation']
+                  labels: [tpl.label, 'help wanted']
                 });
                 
-                // Thoda wait karo taaki GitHub API flood na ho
-                await new Promise(r => setTimeout(r, 1000));
+                // Thoda wait taaki GitHub API block na kare
+                await new Promise(r => setTimeout(r, 2000));
               }
-              console.log(`${needed} new issues created! 🚀`);
-            } else {
-              console.log("Already 4 slots open. No action needed. ✅");
             }
             
