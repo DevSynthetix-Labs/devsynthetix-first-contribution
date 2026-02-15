@@ -8,3 +8,4 @@ To make your first contribution:
 
 ## Contributors list
 - admin
+- Harsh (https://github.com/Harsh-Upadhyay005)
