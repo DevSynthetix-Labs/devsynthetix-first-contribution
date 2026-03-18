@@ -1,4 +1,4 @@
-name: Cycle Manager (4 Unique Slots)
+name: Cycle Manager (4 Unique Slots) 
 
 on:
   pull_request:
