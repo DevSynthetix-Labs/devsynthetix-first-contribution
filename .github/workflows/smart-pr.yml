@@ -1,4 +1,4 @@
-name: Smart AI PR Handler
+name: Smart AI PR Handler 
 
 on:
   pull_request_target:
