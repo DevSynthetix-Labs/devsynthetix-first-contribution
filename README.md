@@ -1,4 +1,4 @@
-# 🚀 DevSynthetix First Contribution
+# 🚀 DevSynthetix Contribution
 
 ![Open Source Love](https://badges.frapsoft.com/os/v1/open-source.svg?v=103)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)
